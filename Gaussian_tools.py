@@ -12,7 +12,7 @@ import math
 
 class Thermochemistry:
     def __init__(self, log_file, temperature, adsorbate_masses = []):
-        self.number_of_adsorbates = len(adsorbate_masses)
+        self.number_of_mobile_species = len(adsorbate_masses)
         self.temperature = temperature
         if not os.path.isfile(log_file):
             print("Invalid log file. Exiting")
@@ -73,7 +73,7 @@ class Thermochemistry:
     def get_translational_q_1D(self, L = 0):
         translational_q_1D = 1
         #if translational degree of freedom (L not =0) or there is at least one mobile species (adsorbates)
-        if not L == 0 and not self.number_of_adsorbates == 0:
+        if not L == 0 and not self.number_of_mobile_species == 0:
             for mass_adsorbate in self.mass_of_adsorbates:
                 translational_q_1D *= math.sqrt(2 * math.pi *mass_adsorbate * c.kBOLTZMANN_JOULE_PER_KELVIN *
                                                 self.temperature /(c.PLANK_CONSTANT_JOULE_SECOND**2)) * L
@@ -83,7 +83,7 @@ class Thermochemistry:
     def get_translational_q_2D(self, A = 0):
         translational_q_2D = 1
         #if translational degree of freedom (A not =0) or there is at least one mobile species (adsorbates)
-        if not A == 0 and not self.number_of_adsorbates == 0:
+        if not A == 0 and not self.number_of_mobile_species == 0:
             for mass_adsorbate in self.mass_of_adsorbates:
                 translational_q_2D *= 2 * math.pi * mass_adsorbate * c.kBOLTZMANN_JOULE_PER_KELVIN * \
                                       self.temperature /(c.PLANK_CONSTANT_JOULE_SECOND**2) * A
@@ -93,7 +93,7 @@ class Thermochemistry:
     def get_translational_q_3D(self, P = 0):
         translational_q_3D = 1
         #if translational degree of freedom (P not =0) or there is at least one mobile species (adsorbates)
-        if not P== 0 and not self.number_of_adsorbates == 0:
+        if not P== 0 and not self.number_of_mobile_species == 0:
             for mass_adsorbate in self.mass_of_adsorbates:
                 translational_q_3D *= (2 * math.pi *mass_adsorbate * c.kBOLTZMANN_JOULE_PER_KELVIN
                                                  / (c.PLANK_CONSTANT_JOULE_SECOND**2))**1.5 \
@@ -132,9 +132,7 @@ class Thermochemistry:
                     zero_point_energy = float(re.search('Zero-point vibrational energy(.*?)\(', line).groups()[0])
         return zero_point_energy
 
-    #options for translation = 0 (Don't consider), 1 (1D degree of freedom translation _translation_parameter is the length)/
-                                                 # 2 (2D degrees of freedom translation_parameter is the area)
-                                                 # 3 (3D degrees of freedom translation_parameter is the pressure of the gas species in Pa)
+
     #J/mol
     def get_electronic_energy(self):
         electronic_energy_plus_zpe = 'NaN'
@@ -148,40 +146,54 @@ class Thermochemistry:
         #electronic_energy = electronic_energy_plus_zpe - zpe
         return (electronic_energy_plus_zpe - self.get_zero_point_energy())
 
-
-    #J/mol/K
-    def get_entropy(self, apply_qrrho = True, rotation = False, translation = 0, translation_parameter = 0):
+    # options for translation = 0 (Don't consider), 1 (1D degree of freedom translation _translation_parameter is the length)/
+    # 2 (2D degrees of freedom translation_parameter is the area)
+    # 3 (3D degrees of freedom translation_parameter is the pressure of the gas species in Pa)
+    # return a dictionary of entropy contributions (J/mol/K) and a dictionary of thermal corrections to energy (J/mol)
+    # as entropy, thermal_corrections
+    def get_entropy_and_thermal_corrections(self, apply_qrrho = True, rotation = False, translation = 0, translation_parameter = 0):
         if translation not in [0, 1, 2, 3]:
             print('"translation" should be 0 (none), 1(1D), 2(2D) or 3(3D). Exiting')
             return 'NaN'
         entropy = dict()
-
-        #translational entropy
+        energy_thermal_corrections = dict()
+        #translational entropy and thermal corrections
         if translation == 0:
             entropy['translational'] = 0
+            energy_thermal_corrections['translational'] = 0
         elif translation ==1:
-            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_1D(translation_parameter)) + (self.number_of_adsorbates * 0.5))
+            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_1D(translation_parameter)) + (self.number_of_mobile_species * 0.5))
+            energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature * \
+                                                          self.number_of_mobile_species * 0.5
         elif translation ==2:
-            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_2D(translation_parameter)) + self.number_of_adsorbates)
+            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_2D(translation_parameter)) + self.number_of_mobile_species)
+            energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature * self.number_of_mobile_species
         else:
             #3D translation (free ideal gas)
-            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_3D(translation_parameter)) + self.number_of_adsorbates * 2.5)
+            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_3D(translation_parameter)) + self.number_of_mobile_species * 2.5)
+            energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature * \
+                                                         self.number_of_mobile_species * 2.5
 
 
-        #rotational entropy
+        #rotational entropy and thermal corrections
         if not rotation:
             #no rotation to be considered
             entropy['rotational'] = 0
+            energy_thermal_corrections['rotational'] = 0
         else:
             entropy['rotational'] = c.R['J/K/mol'] * (math.log(self.get_rotational_q(linear = False)) + 1.5)
+            energy_thermal_corrections['rotational'] = c.R['J/K/mol'] * self.temperature * 1.5
 
 
-        #vibrational entropy
+        #vibrational entropy and thermal corrections
 
-        #entropy considering the harmonic oscillator model only
+        #considering the harmonic oscillator model only
         vibrational_entropies = [c.R['J/K/mol'] * (vibrational_temperature / (self.temperature * (math.exp(vibrational_temperature / self.temperature) - 1))
                                                     - math.log(1 - math.exp(-vibrational_temperature / self.temperature)))
                                                       for vibrational_temperature in self.get_vibrational_temperatures()]
+        vibrational_energies = [c.R['J/K/mol'] * vibrational_temperature * (
+        0.5 + 1 / (math.exp(vibrational_temperature / self.temperature) - 1))
+                                for vibrational_temperature in self.get_vibrational_temperatures()]
 
         if apply_qrrho:
             # reference #1 entropy for QRRHO model
@@ -198,64 +210,23 @@ class Thermochemistry:
 
             corrected_vibrational_entropies = [w * vibrational_entropy + (1-w) * low_frequency_entropy
                                      for w, vibrational_entropy, low_frequency_entropy in zip(w_list, vibrational_entropies, low_frequency_entropies)]
+            corrected_vibrational_energies = [w * vibrational_energy + (1 - w) * 0.5 * c.R['J/K/mol'] * self.temperature
+                                              for w, vibrational_energy in zip(w_list, vibrational_energies)]
         else:
-            #entropy for harmonic oscillator model
+            #entropy and thermal corrections for harmonic oscillator model
             corrected_vibrational_entropies = vibrational_entropies
+            corrected_vibrational_energies = vibrational_energies
+
+
         entropy['vibrational'] = sum(corrected_vibrational_entropies)
+        energy_thermal_corrections['vibrational'] = sum(corrected_vibrational_energies)
 
 
         #Correction term due to Sterling's approximation
         entropy['sterling additive constant'] = c.R['J/K/mol']*(1 - math.log(c.AVOGADRO_NUM))
 
-        return entropy
 
-    # options for translation = 0 (Don't consider), 1 (1D degree of freedom translation _length is the length)/ 2 (2D degrees of freedom translation_length is the area)
-    #J/mol
-    def get_energy_thermal_corrections(self, apply_qrrho = True, rotation = False, translation = 0, translation_length = 0):
-        if translation not in [0, 1, 2, 3]:
-            print('"translation" should be 0(none), 1(1D), 2(2D) or 3(3D). Exiting')
-            return 'NaN'
-        energy_thermal_corrections = dict()
-
-        #translation contribution to energy corrections
-        if translation == 0:
-            energy_thermal_corrections['translational'] = 0
-        elif translation == 1:
-            energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature *\
-                                                          self.number_of_adsorbates * 0.5
-        elif translation == 2:
-            energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature * self.number_of_adsorbates
-        else:
-            # 3D translation (free ideal gas)
-            energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature *\
-                                                          self.number_of_adsorbates * 2.5
-
-        #rotational contribution to energy corrections
-        if not rotation:
-            #no rotation to be considered
-            energy_thermal_corrections['rotational'] = 0
-        else:
-            energy_thermal_corrections['rotational'] = c.R['J/K/mol'] * self.temperature * 1.5
-
-        #vibrational contribution to energy contribution
-
-        #contribution from the harmonic oscillator model
-
-        vibrational_energies = [c.R['J/K/mol'] * vibrational_temperature * (0.5 + 1/(math.exp(vibrational_temperature / self.temperature) - 1))
-                                                      for vibrational_temperature in self.get_vibrational_temperatures()]
-        if apply_qrrho:
-            #reference #2 for enthalpic QRRHO correction
-            frequencies_inv_cm = self.get_frequencies_inv_cm()
-            frequencies_hertz = [frequency_inv_cm * c.SPEED_OF_LIGHT_CENTIMETER_PER_SECOND for frequency_inv_cm in
-                                 frequencies_inv_cm]
-            w_list = [1 / (1 + (100 / frequency) ** 4) for frequency in frequencies_inv_cm]
-            corrected_vibrational_energies = [w * vibrational_energy + (1-w) * 0.5 * c.R['J/K/mol'] * self.temperature
-                                     for w, vibrational_energy in zip(w_list, vibrational_energies)]
-        else:
-            #consider only harmonic oscillator
-            corrected_vibrational_energies = vibrational_energies
-        energy_thermal_corrections['vibrational'] = sum(corrected_vibrational_energies)
-        return energy_thermal_corrections
+        return entropy, energy_thermal_corrections
 
     #all in J/mol
     def get_energies(self, entropy, energy_thermal_corrections):
