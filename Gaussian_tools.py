@@ -11,8 +11,8 @@ import math
 
 
 class Thermochemistry:
-    def __init__(self, log_file, temperature, adsorbate_masses = []):
-        self.number_of_mobile_species = len(adsorbate_masses)
+    def __init__(self, log_file, temperature, mass_mobile_species = []):
+        self.number_of_mobile_species = len(mass_mobile_species)
         self.temperature = temperature
         if not os.path.isfile(log_file):
             print("Invalid log file. Exiting")
@@ -20,7 +20,7 @@ class Thermochemistry:
         else:
             self.log_file = log_file
             #convert adsorbate masses to kg (from AMU) and store as attribute
-            self.mass_mobile_species = [c.AMU_TO_KG * atomic_mass for atomic_mass in adsorbate_masses]
+            self.mass_mobile_species = [c.AMU_TO_KG * atomic_mass for atomic_mass in mass_mobile_species]
 
     #get AMU from logfile
     def get_amu(self):
