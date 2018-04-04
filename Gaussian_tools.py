@@ -33,7 +33,6 @@ class Thermochemistry:
                         amu = (re.search('Molecular mass:(.*)',line) .groups()[0]).split()
                         amu = float(amu[0])
         except:
-            except:
             print("Error opening log file.")
             exit(-1)
         return amu
