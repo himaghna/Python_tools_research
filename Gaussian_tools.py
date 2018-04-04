@@ -22,6 +22,23 @@ class Thermochemistry:
             #convert adsorbate masses to kg (from AMU) and store as attribute
             self.mass_of_adsorbates = [c.AMU_TO_KG * atomic_mass for atomic_mass in adsorbate_masses]
 
+    #get AMU from logfile
+    def get_amu(self):
+        amu = -1  # default initialization
+        try:
+
+            with open(self.log_file) as fp:
+                for line in fp:
+                    if re.search('Molecular mass:(.*)',line):
+                        amu = (re.search('Molecular mass:(.*)',line) .groups()[0]).split()
+                        amu = float(amu[0])
+        except:
+            except:
+            print("Error opening log file.")
+            exit(-1)
+        return amu
+
+
     # returns the vibrational frequencies as an output list
     def get_frequencies_inv_cm(self):
         frequencies = []
@@ -223,7 +240,7 @@ class Thermochemistry:
 
 
         #Correction term due to Sterling's approximation
-        entropy['sterling additive constant'] = c.R['J/K/mol']*(1 - math.log(c.AVOGADRO_NUM))
+        entropy['sterling additive constant'] = c.R['J/K/mol']
 
 
         return entropy, energy_thermal_corrections
@@ -233,10 +250,9 @@ class Thermochemistry:
         energies = dict()
         total_thermal_corrections_energy = sum([energy_thermal_corrections[key] for key in energy_thermal_corrections])
         energies['electronic_energy'] = self.get_electronic_energy()
-        energies['internal_energy'] = energies['electronic_energy'] + total_thermal_corrections_energy
+        energies['internal_energy'] = energies['electronic_energy'] + total_thermal_corrections_energy + self.get_zero_point_energy()
         energies['enthalpy'] = energies['internal_energy'] + c.R['J/K/mol']*self.temperature
         energies['gibbs_free_energy'] = energies['enthalpy'] - self.temperature * sum([entropy[key] for key in entropy])
-        energies['zero_point_energy'] = self.get_zero_point_energy()
         return energies
 
 
