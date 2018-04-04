@@ -12,6 +12,9 @@ import math
 
 class Thermochemistry:
     def __init__(self, log_file, temperature, mass_mobile_species = []):
+        if mass_mobile_species == 'get':
+            #if 'get' passed, get mass of species in amu units from log file. Usually for gas species
+            mass_mobile_species = list(self.get_amu())
         self.number_of_mobile_species = len(mass_mobile_species)
         self.temperature = temperature
         if not os.path.isfile(log_file):
