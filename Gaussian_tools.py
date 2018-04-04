@@ -88,7 +88,7 @@ class Thermochemistry:
     #get molecular partition function for translation considering 1 degree of freedom with L being length of the free dimension of translation
     def get_translational_q_1D(self, L = 0):
         translational_q_1D = 1
-        #if translational degree of freedom (L not =0) or there is at least one mobile species (adsorbates)
+        #if translational degree of freedom (L not =0) or there is at least one mobile species ( or adsorbates)
         if not L == 0 and not self.number_of_mobile_species == 0:
             for mass_single_species in self.mass_mobile_species:
                 translational_q_1D *= math.sqrt(2 * math.pi *mass_single_species * c.kBOLTZMANN_JOULE_PER_KELVIN *
