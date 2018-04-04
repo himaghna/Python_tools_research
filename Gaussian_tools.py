@@ -20,7 +20,7 @@ class Thermochemistry:
         else:
             self.log_file = log_file
             #convert adsorbate masses to kg (from AMU) and store as attribute
-            self.mass_of_adsorbates = [c.AMU_TO_KG * atomic_mass for atomic_mass in adsorbate_masses]
+            self.mass_mobile_species = [c.AMU_TO_KG * atomic_mass for atomic_mass in adsorbate_masses]
 
     #get AMU from logfile
     def get_amu(self):
@@ -90,8 +90,8 @@ class Thermochemistry:
         translational_q_1D = 1
         #if translational degree of freedom (L not =0) or there is at least one mobile species (adsorbates)
         if not L == 0 and not self.number_of_mobile_species == 0:
-            for mass_adsorbate in self.mass_of_adsorbates:
-                translational_q_1D *= math.sqrt(2 * math.pi *mass_adsorbate * c.kBOLTZMANN_JOULE_PER_KELVIN *
+            for mass_single_species in self.mass_mobile_species:
+                translational_q_1D *= math.sqrt(2 * math.pi *mass_single_species * c.kBOLTZMANN_JOULE_PER_KELVIN *
                                                 self.temperature /(c.PLANK_CONSTANT_JOULE_SECOND**2)) * L
         return translational_q_1D
 
@@ -100,8 +100,8 @@ class Thermochemistry:
         translational_q_2D = 1
         #if translational degree of freedom (A not =0) or there is at least one mobile species (adsorbates)
         if not A == 0 and not self.number_of_mobile_species == 0:
-            for mass_adsorbate in self.mass_of_adsorbates:
-                translational_q_2D *= 2 * math.pi * mass_adsorbate * c.kBOLTZMANN_JOULE_PER_KELVIN * \
+            for mass_single_species in self.mass_mobile_species:
+                translational_q_2D *= 2 * math.pi * mass_single_species * c.kBOLTZMANN_JOULE_PER_KELVIN * \
                                       self.temperature /(c.PLANK_CONSTANT_JOULE_SECOND**2) * A
         return translational_q_2D
 
@@ -110,8 +110,8 @@ class Thermochemistry:
         translational_q_3D = 1
         #if translational degree of freedom (P not =0) or there is at least one mobile species (adsorbates)
         if not P== 0 and not self.number_of_mobile_species == 0:
-            for mass_adsorbate in self.mass_of_adsorbates:
-                translational_q_3D *= (2 * math.pi *mass_adsorbate * c.kBOLTZMANN_JOULE_PER_KELVIN
+            for mass_single_species in self.mass_mobile_species:
+                translational_q_3D *= (2 * math.pi *mass_single_species * c.kBOLTZMANN_JOULE_PER_KELVIN
                                                  / (c.PLANK_CONSTANT_JOULE_SECOND**2))**1.5 \
                                                                                      * (c.kBOLTZMANN_JOULE_PER_KELVIN/P) * self.temperature**2.5
         return translational_q_3D
