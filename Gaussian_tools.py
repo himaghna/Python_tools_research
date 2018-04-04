@@ -12,10 +12,6 @@ import math
 
 class Thermochemistry:
     def __init__(self, log_file, temperature, mass_mobile_species = []):
-        if mass_mobile_species == 'get':
-            #if 'get' passed, get mass of species in amu units from log file. Usually for gas species
-            mass_mobile_species = list(self.get_amu())
-        self.number_of_mobile_species = len(mass_mobile_species)
         self.temperature = temperature
         if not os.path.isfile(log_file):
             print("Invalid log file. Exiting")
@@ -23,7 +19,12 @@ class Thermochemistry:
         else:
             self.log_file = log_file
             #convert adsorbate masses to kg (from AMU) and store as attribute
-            self.mass_mobile_species = [c.AMU_TO_KG * atomic_mass for atomic_mass in mass_mobile_species]
+            if mass_mobile_species == 'get':
+                # if 'get' passed, get mass of species in amu units from log file. Usually for gas species
+                self.mass_mobile_species = [c.AMU_TO_KG * self.get_amu()]
+            else:
+                self.mass_mobile_species = [c.AMU_TO_KG * atomic_mass for atomic_mass in mass_mobile_species]
+        self.number_of_mobile_species = len(self.mass_mobile_species)
 
     #get AMU from logfile
     def get_amu(self):
@@ -50,7 +51,9 @@ class Thermochemistry:
                     if "Frequencies" in line.strip("\n"):
                         for word in line.split():
                             if not word == "Frequencies" and not word == '--':
-                                frequencies.append(float(word))
+                                if not float(word)<0 :
+                                    #not imaginary frequencies
+                                    frequencies.append(float(word))
             return frequencies
         except:
             print("Error opening log file.")
@@ -94,7 +97,7 @@ class Thermochemistry:
         #if translational degree of freedom (L not =0) or there is at least one mobile species ( or adsorbates)
         if not L == 0 and not self.number_of_mobile_species == 0:
             for mass_single_species in self.mass_mobile_species:
-                translational_q_1D *= math.sqrt(2 * math.pi *mass_single_species * c.kBOLTZMANN_JOULE_PER_KELVIN *
+                translational_q_1D *= math.sqrt(2 * math.pi * mass_single_species * c.kBOLTZMANN_JOULE_PER_KELVIN *
                                                 self.temperature /(c.PLANK_CONSTANT_JOULE_SECOND**2)) * L
         return translational_q_1D
 
@@ -126,7 +129,7 @@ class Thermochemistry:
             exit(-1)
         rotational_q = 1
         rotational_temperatures = self.get_rotational_temperatures()
-        #if general polyatomic molecule with 3 rotational temeperature
+        #if general polyatomic molecule with 3 rotational temperature
         if not linear:
             rotational_q = (self.temperature**1.5/self.get_symmetry_number()) * math.sqrt(math.pi/(rotational_temperatures[0] *
                                                                                                    rotational_temperatures[1] * rotational_temperatures[2]))
@@ -180,7 +183,7 @@ class Thermochemistry:
         if translation == 0:
             entropy['translational'] = 0
             energy_thermal_corrections['translational'] = 0
-        elif translation ==1:
+        elif translation == 1:
             entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_1D(translation_parameter)) + (self.number_of_mobile_species * 0.5))
             energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature * \
                                                           self.number_of_mobile_species * 0.5
