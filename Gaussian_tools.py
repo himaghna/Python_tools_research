@@ -8,7 +8,7 @@ import os
 import constants as c
 import re
 import math
-
+import numpy as np
 
 class Thermochemistry:
     def __init__(self, log_file, temperature, mass_mobile_species = []):
@@ -256,9 +256,40 @@ class Thermochemistry:
         total_thermal_corrections_energy = sum([energy_thermal_corrections[key] for key in energy_thermal_corrections])
         energies['electronic_energy'] = self.get_electronic_energy()
         energies['internal_energy'] = energies['electronic_energy'] + total_thermal_corrections_energy + self.get_zero_point_energy()
-        energies['enthalpy'] = energies['internal_energy'] + c.R['J/K/mol']*self.temperature
+        if self.number_of_mobile_species == 0:
+            # if species is adsorbed (no mobile species) then U = H
+            energies['enthalpy'] = energies['internal_energy']
+        else:
+            energies['enthalpy'] = energies['internal_energy'] + c.R['J/K/mol']*self.temperature
         energies['gibbs_free_energy'] = energies['enthalpy'] - self.temperature * sum([entropy[key] for key in entropy])
         return energies
+
+    #method taken from John Lym
+
+    def fit_CpoR(self, T, CpoR):
+        """
+        Fits parameters a1 - a6 using dimensionless heat capacity and temperature.
+        """
+        #If the Cp/R does not vary with temperature (occurs when no vibrational frequencies are listed)
+        if (np.mean(CpoR) < 1e-6 and np.isnan(variation(CpoR))) or variation(CpoR) < 1e-3:
+           self.T_mid = T[len(T)/2]
+           self.a_low = np.array(7*[0.])
+           self.a_high = np.array(7*[0.])
+        else:
+            max_R2 = -1
+            R2 = np.zeros(len(T))
+            for i, T_mid in enumerate(T):
+                #Need at least 5 points to fit the polynomial
+                if i > 5 and i < (len(T)-6):
+                    #Separate the temperature and heat capacities into low and high range
+                    (R2[i], a_low, a_high) = self._get_CpoR_R2(T, CpoR, i)
+            max_R2 = max(R2)
+            max_i = np.where(max_R2 == R2)[0][0]
+            (max_R2, a_low_rev, a_high_rev) = self._get_CpoR_R2(T, CpoR, max_i)
+            empty_arr = np.array([0.]*2)
+            self.T_mid = T[max_i]
+            self.a_low = np.concatenate((a_low_rev[::-1], empty_arr))
+            self.a_high = np.concatenate((a_high_rev[::-1], empty_arr))
 
 
 
