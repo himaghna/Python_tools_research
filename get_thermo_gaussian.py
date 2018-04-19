@@ -1,0 +1,117 @@
+'''
+@author: Himaghna
+date: 18th April 2018
+description: run with a foldername to get thermochemistry of all log files in the folder
+'''
+
+'''author: Himaghna
+   date: 12th April 2018
+   description: generate thermochemical values at range of temperature and use those to generate nasa polyomial'''
+from py_box.thermo.nasa import Nasa
+import os
+import numpy as np
+import glob
+from Gaussian_tools import Thermochemistry
+import constants as c
+import datetime
+
+
+def build_argument(is_gas, pressure = None):
+    if is_gas:
+        if not pressure:
+            # no pressure defined for gas
+            print('Enter pressure')
+            return 'NaN'
+        argument = {
+            'apply_qrrho': True,
+            'rotation': True,
+            'translation': 3,
+            'translation_parameter': pressure
+        }
+        mass_mobile_species = 'get'
+    else:
+        # if not gas consider only vibrational
+        argument = {
+            'apply_qrrho': True,
+            'rotation': False,
+            'translation': 0,
+            'translation_parameter': ''
+        }
+        mass_mobile_species = []
+    return argument, mass_mobile_species
+
+
+def write_to_excel(out_file  = '', data = ()):
+    import xlsxwriter
+    workbook = xlsxwriter.Workbook(filename=out_file)
+    worksheet = workbook.add_worksheet()
+    for index,row in enumerate(data):
+        worksheet.write_row(index, 0, tuple(row))
+
+def __main__(path, temperature, pressure = 101325):
+
+    if os.path.isdir(path):
+        #folder supplied as argument
+        time_stamp = datetime.datetime.now()
+        out_file_SI = path + '/thermochemistry_all_species_SI-units_' + str(time_stamp.date()) + '.xlsx'
+        out_file_kcal = path + '/thermochemistry_all_species_KCAL_' + str(time_stamp.date()) + '.xlsx'
+        out_list_SI =[['Species', 'Gibbs (J/mol)', 'Enthalpy(J/mol)', 'Entropy(J/mol/K)', 'Electronic(J/mol)', 'ZPE(J/mol)']]
+        out_list_kcal = [['Species', 'Gibbs (J/mol)', 'Enthalpy(kcal/mol)', 'Entropy(kcal/mol/K)', 'Electronic(kcal/mol)', 'ZPE(kcal/mol)']]
+        for file in glob.glob(os.path.join(path, '*.log')):
+            print(file)
+            #check if logfile represents a species adsorbed on Q1 site
+            if file.split('-')[0].split('/')[-1] == 'Q1':
+                is_gas = False
+                print('Treating species as adsorbed with only vibrational degrees of freedom...')
+            else:
+                is_gas = True
+                print('Treating species as ideal gas...')
+
+            #build argument for calling get_entropy_and_thermal_corrections method and also define mass_mobile_species
+            argument, mass_mobile_species= build_argument(is_gas = is_gas, pressure= pressure)
+
+            #instantiate Thermochemistry class
+            thermo_object = Thermochemistry(log_file=file, temperature=temperature, mass_mobile_species=mass_mobile_species)
+            entropy, energy_corrections = thermo_object.get_entropy_and_thermal_corrections(**argument)
+            energies = thermo_object.get_energies(entropy, energy_corrections)
+
+            #tabulate outputs
+            G_SI = energies['gibbs_free_energy']
+            G_kcal = G_SI * c.JOULES_TO_KCAL
+
+            H_SI = energies['enthalpy']
+            H_kcal = H_SI * c.JOULES_TO_KCAL
+
+            S_SI = sum([entropy[key] for key in entropy])
+            S_kcal = S_SI * c.JOULES_TO_KCAL
+
+            Electronic_SI = energies['electronic_energy']
+            Electronic_kcal = Electronic_SI * c.JOULES_TO_KCAL
+
+            ZPE_SI = thermo_object.get_zero_point_energy()
+            ZPE_kcal = ZPE_SI * c.JOULES_TO_KCAL
+
+            out_list_SI.append([file.split('.')[0].split('/')[-1], G_SI, H_SI, S_SI, Electronic_SI, ZPE_SI])
+            out_list_kcal.append([file.split('.')[0].split('/')[-1], G_kcal, H_kcal, S_kcal, Electronic_kcal, ZPE_kcal])
+
+
+        write_to_excel(out_file=out_file_SI, data=out_list_SI)
+        write_to_excel(out_file=out_file_kcal, data=out_list_kcal)
+
+
+__main__(path = '/Users/Ne0/Documents/Prof/Research/MkM/gaussian_log_files/shit/', temperature=298.15, pressure=101325)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

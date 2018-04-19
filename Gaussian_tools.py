@@ -23,10 +23,15 @@ class Thermochemistry:
                 # if 'get' passed, get mass of species in amu units from log file. Usually for gas species
                 self.mass_mobile_species = [c.AMU_TO_KG * self.get_amu()]
             else:
-                self.mass_mobile_species = [c.AMU_TO_KG * atomic_mass for atomic_mass in mass_mobile_species]
-        self.number_of_mobile_species = len(self.mass_mobile_species)
+                if mass_mobile_species:
+                    #if mass_mobile_list is not empty
+                    self.mass_mobile_species = [c.AMU_TO_KG * atomic_mass for atomic_mass in mass_mobile_species]
+        if mass_mobile_species:
+            self.number_of_mobile_species = len(self.mass_mobile_species)
+        else:
+            self.number_of_mobile_species = 0
 
-    #get AMU from logfile
+            #get AMU from logfile
     def get_amu(self):
         amu = -1  # default initialization
         try:
@@ -131,7 +136,7 @@ class Thermochemistry:
         rotational_temperatures = self.get_rotational_temperatures()
         #if general polyatomic molecule with 3 rotational temperature
         if not linear:
-            rotational_q = (self.temperature**1.5/self.get_symmetry_number()) * math.sqrt(math.pi/(rotational_temperatures[0] *
+            rotational_q = ((self.temperature**1.5)/self.get_symmetry_number()) * math.sqrt(math.pi/(rotational_temperatures[0] *
                                                                                                    rotational_temperatures[1] * rotational_temperatures[2]))
         #if linear molecule with one rotational temperature
         else:
@@ -154,6 +159,21 @@ class Thermochemistry:
                     zero_point_energy = float(re.search('Zero-point vibrational energy(.*?)\(', line).groups()[0])
         return zero_point_energy
 
+    def get_spin_multiplicity(self):
+        try:
+            spin_multiplicity = ''
+            with open(self.log_file) as fp:
+                for line in fp:
+                    if re.search('Multiplicity(.*)', line):
+                        spin_multiplicity = (re.search('Multiplicity(.*)', line).groups()[0]).split()
+                        spin_multiplicity = float(spin_multiplicity[1])
+            return spin_multiplicity
+        except:
+            print("Error opening log file.")
+            exit(-1)
+    #electronic partition function = q_electronic
+    def get_electronic_q(self):
+        return self.get_spin_multiplicity()
 
     #J/mol
     def get_electronic_energy(self):
@@ -192,9 +212,11 @@ class Thermochemistry:
             energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature * self.number_of_mobile_species
         else:
             #3D translation (free ideal gas)
-            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_3D(translation_parameter)) + self.number_of_mobile_species * 2.5)
+            entropy['translational'] = c.R['J/K/mol'] * (math.log(self.get_translational_q_3D(translation_parameter)) + self.number_of_mobile_species * 1.5)
             energy_thermal_corrections['translational'] = c.R['J/K/mol'] * self.temperature * \
-                                                         self.number_of_mobile_species * 2.5
+                                                         self.number_of_mobile_species * 1.5
+
+        entropy['electronic'] = math.log(self.get_electronic_q())
 
 
         #rotational entropy and thermal corrections
@@ -213,6 +235,7 @@ class Thermochemistry:
         vibrational_entropies = [c.R['J/K/mol'] * (vibrational_temperature / (self.temperature * (math.exp(vibrational_temperature / self.temperature) - 1))
                                                     - math.log(1 - math.exp(-vibrational_temperature / self.temperature)))
                                                       for vibrational_temperature in self.get_vibrational_temperatures()]
+        #vibrational energy calculated with zero at BOT. Thus it include ZPE. Do not add it again later.
         vibrational_energies = [c.R['J/K/mol'] * vibrational_temperature * (
         0.5 + 1 / (math.exp(vibrational_temperature / self.temperature) - 1))
                                 for vibrational_temperature in self.get_vibrational_temperatures()]
@@ -255,7 +278,7 @@ class Thermochemistry:
         energies = dict()
         total_thermal_corrections_energy = sum([energy_thermal_corrections[key] for key in energy_thermal_corrections])
         energies['electronic_energy'] = self.get_electronic_energy()
-        energies['internal_energy'] = energies['electronic_energy'] + total_thermal_corrections_energy + self.get_zero_point_energy()
+        energies['internal_energy'] = energies['electronic_energy'] + total_thermal_corrections_energy
         if self.number_of_mobile_species == 0:
             # if species is adsorbed (no mobile species) then U = H
             energies['enthalpy'] = energies['internal_energy']
@@ -263,35 +286,6 @@ class Thermochemistry:
             energies['enthalpy'] = energies['internal_energy'] + c.R['J/K/mol']*self.temperature
         energies['gibbs_free_energy'] = energies['enthalpy'] - self.temperature * sum([entropy[key] for key in entropy])
         return energies
-
-    #method taken from John Lym
-
-    def fit_CpoR(self, T, CpoR):
-        """
-        Fits parameters a1 - a6 using dimensionless heat capacity and temperature.
-        """
-        #If the Cp/R does not vary with temperature (occurs when no vibrational frequencies are listed)
-        if (np.mean(CpoR) < 1e-6 and np.isnan(variation(CpoR))) or variation(CpoR) < 1e-3:
-           self.T_mid = T[len(T)/2]
-           self.a_low = np.array(7*[0.])
-           self.a_high = np.array(7*[0.])
-        else:
-            max_R2 = -1
-            R2 = np.zeros(len(T))
-            for i, T_mid in enumerate(T):
-                #Need at least 5 points to fit the polynomial
-                if i > 5 and i < (len(T)-6):
-                    #Separate the temperature and heat capacities into low and high range
-                    (R2[i], a_low, a_high) = self._get_CpoR_R2(T, CpoR, i)
-            max_R2 = max(R2)
-            max_i = np.where(max_R2 == R2)[0][0]
-            (max_R2, a_low_rev, a_high_rev) = self._get_CpoR_R2(T, CpoR, max_i)
-            empty_arr = np.array([0.]*2)
-            self.T_mid = T[max_i]
-            self.a_low = np.concatenate((a_low_rev[::-1], empty_arr))
-            self.a_high = np.concatenate((a_high_rev[::-1], empty_arr))
-
-
 
 
 
