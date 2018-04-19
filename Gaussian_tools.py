@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''@Author: Himaghna
    Date: March 17th 2018
    Description: file encapsulates the gaussian log file and defines operations for extracting information from it

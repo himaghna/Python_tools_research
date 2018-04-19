@@ -1,12 +1,10 @@
+# -*- coding: utf-8 -*-
 '''
 @author: Himaghna
 date: 18th April 2018
 description: run with a foldername to get thermochemistry of all log files in the folder
 '''
 
-'''author: Himaghna
-   date: 12th April 2018
-   description: generate thermochemical values at range of temperature and use those to generate nasa polyomial'''
 from py_box.thermo.nasa import Nasa
 import os
 import numpy as np
@@ -14,7 +12,8 @@ import glob
 from Gaussian_tools import Thermochemistry
 import constants as c
 import datetime
-
+import argparse
+import xlsxwriter
 
 def build_argument(is_gas, pressure = None):
     if is_gas:
@@ -42,7 +41,6 @@ def build_argument(is_gas, pressure = None):
 
 
 def write_to_excel(out_file  = '', data = ()):
-    import xlsxwriter
     workbook = xlsxwriter.Workbook(filename=out_file)
     worksheet = workbook.add_worksheet()
     for index,row in enumerate(data):
@@ -56,7 +54,7 @@ def __main__(path, temperature, pressure = 101325):
         out_file_SI = path + '/thermochemistry_all_species_SI-units_' + str(time_stamp.date()) + '.xlsx'
         out_file_kcal = path + '/thermochemistry_all_species_KCAL_' + str(time_stamp.date()) + '.xlsx'
         out_list_SI =[['Species', 'Gibbs (J/mol)', 'Enthalpy(J/mol)', 'Entropy(J/mol/K)', 'Electronic(J/mol)', 'ZPE(J/mol)']]
-        out_list_kcal = [['Species', 'Gibbs (J/mol)', 'Enthalpy(kcal/mol)', 'Entropy(kcal/mol/K)', 'Electronic(kcal/mol)', 'ZPE(kcal/mol)']]
+        out_list_kcal = [['Species', 'Gibbs (kcal/mol)', 'Enthalpy(kcal/mol)', 'Entropy(kcal/mol/K)', 'Electronic(kcal/mol)', 'ZPE(kcal/mol)']]
         for file in glob.glob(os.path.join(path, '*.log')):
             print(file)
             #check if logfile represents a species adsorbed on Q1 site
@@ -93,13 +91,30 @@ def __main__(path, temperature, pressure = 101325):
 
             out_list_SI.append([file.split('.')[0].split('/')[-1], G_SI, H_SI, S_SI, Electronic_SI, ZPE_SI])
             out_list_kcal.append([file.split('.')[0].split('/')[-1], G_kcal, H_kcal, S_kcal, Electronic_kcal, ZPE_kcal])
+        out_list_SI.append(['Temperature:', temperature])
+        out_list_SI.append(['Pressure:', pressure])
+        out_list_kcal.append(['Temperature:', temperature])
+        out_list_kcal.append(['Pressure:', pressure])
 
 
         write_to_excel(out_file=out_file_SI, data=out_list_SI)
         write_to_excel(out_file=out_file_kcal, data=out_list_kcal)
 
 
-__main__(path = '/Users/Ne0/Documents/Prof/Research/MkM/gaussian_log_files/shit/', temperature=298.15, pressure=101325)
+
+parser = argparse.ArgumentParser(description = 'Enter')
+
+parser.add_argument('path', type=str, default=None,
+                    help='Name of folder with log files from Gaussian')
+parser.add_argument('-t', '--temperature', type =float, default = 120.0,
+                    help = 'Temperature is degree Celsius for applying thermal corrections')
+parser.add_argument('-p', '--pressure',type = float, default = 1.0,
+                    help = 'Pressure in atmospheres')
+command_args =  parser.parse_args()
+path = command_args.path
+temperature = command_args.temperature + 273.15 #convert to Kelvin
+pressure = command_args.pressure *c.ATM_TO_PASCAL #convert to Pascal
+__main__(path = path, temperature= temperature, pressure=pressure)
 
 
 
