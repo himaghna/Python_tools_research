@@ -58,7 +58,7 @@ def __main__(path, temperature, pressure = 101325):
         for file in glob.glob(os.path.join(path, '*.log')):
             print(file)
             #check if logfile represents a species adsorbed on Q1 site
-            if file.split('-')[0].split('/')[-1] == 'Q1':
+            if file.split('/')[-1].split('-')[0] == 'Q1':
                 is_gas = False
                 print('Treating species as adsorbed with only vibrational degrees of freedom...')
             else:
