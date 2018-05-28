@@ -3,17 +3,16 @@
 @author: Himaghna
 date: 18th April 2018
 description: run with a foldername to get thermochemistry of all log files in the folder
+call syntax python3 ./get_thermo_gaussian.py <input folder name> -t <temperature Default 120'C> -p <pressure. Default 1 atmosphere>
 '''
 
-from py_box.thermo.nasa import Nasa
-import os
-import numpy as np
 import glob
 from Gaussian_tools import Thermochemistry
 import constants as c
 import datetime
 import argparse
 import xlsxwriter
+import os
 
 def build_argument(is_gas, pressure = None):
     if is_gas:
@@ -51,14 +50,20 @@ def __main__(path, temperature, pressure = 101325):
     if os.path.isdir(path):
         #folder supplied as argument
         time_stamp = datetime.datetime.now()
-        out_file_SI = path + '/thermochemistry_all_species_SI-units_' + str(time_stamp.date()) + '.xlsx'
-        out_file_kcal = path + '/thermochemistry_all_species_KCAL_' + str(time_stamp.date()) + '.xlsx'
+        output_folder_kcal = path + '/thermochemistry_in_kcal'
+        output_folder_SI = path + '/thermochemistry_in_SI'
+        if not os.path.isdir(output_folder_kcal):
+            os.system("mkdir " + output_folder_kcal)
+        if not os.path.isdir(output_folder_SI):
+            os.system("mkdir " + output_folder_SI)
+        out_file_SI = output_folder_SI + '/thermochemistry_all_species_SI-units_' + str(time_stamp.date()) + '.xlsx'
+        out_file_kcal = output_folder_kcal + '/' + 'thermo_' + str(temperature) + '_' + str(time_stamp.date()) + '.xlsx'
         out_list_SI =[['Species', 'Gibbs (J/mol)', 'Enthalpy(J/mol)', 'Entropy(J/mol/K)', 'Electronic(J/mol)', 'ZPE(J/mol)']]
         out_list_kcal = [['Species', 'Gibbs (kcal/mol)', 'Enthalpy(kcal/mol)', 'Entropy(kcal/mol/K)', 'Electronic(kcal/mol)', 'ZPE(kcal/mol)']]
         for file in glob.glob(os.path.join(path, '*.log')):
             print(file)
-            #check if logfile represents a species adsorbed on Q1 site
-            if file.split('/')[-1].split('-')[0] == 'Q1':
+            #check if logfile represents a species adsorbed on surface
+            if file.split('/')[-1].split('-')[0] == 'surf':
                 is_gas = False
                 print('Treating species as adsorbed with only vibrational degrees of freedom...')
             else:
@@ -110,7 +115,7 @@ parser.add_argument('-t', '--temperature', type =float, default = 120.0,
                     help = 'Temperature is degree Celsius for applying thermal corrections')
 parser.add_argument('-p', '--pressure',type = float, default = 1.0,
                     help = 'Pressure in atmospheres')
-command_args =  parser.parse_args()
+command_args = parser.parse_args()
 path = command_args.path
 temperature = command_args.temperature + 273.15 #convert to Kelvin
 pressure = command_args.pressure *c.ATM_TO_PASCAL #convert to Pascal
